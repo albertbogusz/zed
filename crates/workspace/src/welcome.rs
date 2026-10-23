@@ -7,8 +7,8 @@ use crate::{
 use agent_settings::AgentSettings;
 use git::Clone as GitClone;
 use gpui::{
-    Action, App, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    ParentElement, Render, Styled, Task, TaskExt, Window, actions,
+    Action, AnyElement, App, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    InteractiveElement, ParentElement, Render, Styled, Task, TaskExt, Window, actions,
 };
 use gpui::{WeakEntity, linear_color_stop, linear_gradient};
 use menu::{SelectNext, SelectPrevious};
@@ -162,6 +162,8 @@ impl SectionEntry {
         })
     }
 }
+
+const RECENT_PROJECTS_LIMIT: usize = 5;
 
 const CONTENT: (Section<4>, Section<3>) = (
     Section {
@@ -378,14 +380,14 @@ impl WelcomePage {
             )
     }
 
-    fn render_recent_project_section(
-        &self,
-        recent_projects: Vec<impl IntoElement>,
-    ) -> impl IntoElement {
+    fn render_recent_project_section(&self, recent_projects: Vec<AnyElement>) -> impl IntoElement {
+        let empty_row_count = RECENT_PROJECTS_LIMIT.saturating_sub(recent_projects.len());
+
         v_flex()
             .w_full()
             .child(SectionHeader::new("Recent Projects"))
             .children(recent_projects)
+            .children((0..empty_row_count).map(|_| div().h(ButtonSize::Medium.rems())))
     }
 
     fn render_recent_project(
@@ -427,7 +429,7 @@ impl Render for WelcomePage {
             .as_ref()
             .into_iter()
             .flatten()
-            .take(5)
+            .take(RECENT_PROJECTS_LIMIT)
             .enumerate()
             .map(|(index, workspace)| {
                 self.render_recent_project(
@@ -436,13 +438,19 @@ impl Render for WelcomePage {
                     &workspace.location,
                     &workspace.identity_paths,
                 )
+                .into_any_element()
             })
             .collect::<Vec<_>>();
 
+        let loading_recent_projects =
+            self.fallback_to_recent_projects && self.recent_workspaces.is_none();
         let showing_recent_projects =
             self.fallback_to_recent_projects && !recent_projects.is_empty();
         let second_section = if showing_recent_projects {
             self.render_recent_project_section(recent_projects)
+                .into_any_element()
+        } else if loading_recent_projects {
+            self.render_recent_project_section(Vec::new())
                 .into_any_element()
         } else {
             second_section
@@ -492,11 +500,14 @@ impl Render for WelcomePage {
                     )
                     .child(first_section.render(Default::default(), &self.focus_handle))
                     .child(second_section)
-                    .when(ai_enabled && !showing_recent_projects, |this| {
-                        let agent_tab_index = next_tab_index;
-                        next_tab_index += 1;
-                        this.child(self.render_agent_card(agent_tab_index, cx))
-                    })
+                    .when(
+                        ai_enabled && !showing_recent_projects && !loading_recent_projects,
+                        |this| {
+                            let agent_tab_index = next_tab_index;
+                            next_tab_index += 1;
+                            this.child(self.render_agent_card(agent_tab_index, cx))
+                        },
+                    )
                     .when(!self.fallback_to_recent_projects, |this| {
                         this.child(
                             v_flex().gap_4().child(Divider::horizontal()).child(
