@@ -228,6 +228,19 @@ impl GitHostingProvider for Forgejo {
         permalink
     }
 
+    fn build_create_pull_request_url(
+        &self,
+        remote: &ParsedGitRemote,
+        source_branch: &str,
+    ) -> Option<Url> {
+        let ParsedGitRemote { owner, repo } = remote;
+        let encoded_source = urlencoding::encode(source_branch);
+
+        self.base_url()
+            .join(&format!("{owner}/{repo}/compare/{encoded_source}?expand=1"))
+            .ok()
+    }
+
     async fn commit_author_avatar_url(
         &self,
         repo_owner: &str,
@@ -270,6 +283,43 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
+
+    #[test]
+    fn test_build_create_pull_request_url() -> Result<()> {
+        let remote = ParsedGitRemote {
+            owner: "zed-industries".into(),
+            repo: "zed".into(),
+        };
+
+        for (source_branch, encoded_source) in [
+            ("new-feature", "new-feature"),
+            ("feature/new-feature", "feature%2Fnew-feature"),
+            ("feature/fix-#123", "feature%2Ffix-%23123"),
+            ("feature/100%+done", "feature%2F100%25%2Bdone"),
+            ("feature/café", "feature%2Fcaf%C3%A9"),
+        ] {
+            for provider in [
+                Forgejo::public_instance(),
+                Forgejo::from_remote_url(
+                    "git@forgejo.some-enterprise.com:zed-industries/zed.git",
+                )?,
+            ] {
+                let url = provider
+                    .build_create_pull_request_url(&remote, source_branch)
+                    .context("failed to construct pull request URL")?;
+
+                assert_eq!(
+                    url.as_str(),
+                    format!(
+                        "{}zed-industries/zed/compare/{encoded_source}?expand=1",
+                        provider.base_url(),
+                    ),
+                );
+            }
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn test_parse_remote_url_given_ssh_url() {
