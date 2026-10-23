@@ -300,9 +300,7 @@ mod tests {
         ] {
             for provider in [
                 Forgejo::public_instance(),
-                Forgejo::from_remote_url(
-                    "git@forgejo.some-enterprise.com:zed-industries/zed.git",
-                )?,
+                Forgejo::from_remote_url("git@forgejo.some-enterprise.com:zed-industries/zed.git")?,
             ] {
                 let url = provider
                     .build_create_pull_request_url(&remote, source_branch)
