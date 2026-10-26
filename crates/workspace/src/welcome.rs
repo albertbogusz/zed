@@ -163,6 +163,7 @@ impl SectionEntry {
     }
 }
 
+
 const CONTENT: (Section<4>, Section<3>) = (
     Section {
         title: "Get Started",
@@ -439,6 +440,8 @@ impl Render for WelcomePage {
             })
             .collect::<Vec<_>>();
 
+        let loading_recent_projects =
+            self.fallback_to_recent_projects && self.recent_workspaces.is_none();
         let showing_recent_projects =
             self.fallback_to_recent_projects && !recent_projects.is_empty();
         let second_section = if showing_recent_projects {
@@ -465,52 +468,58 @@ impl Render for WelcomePage {
             .size_full()
             .bg(cx.theme().colors().editor_background)
             .justify_center()
-            .child(
-                v_flex()
-                    .id("welcome-content")
-                    .p_8()
-                    .max_w_128()
-                    .size_full()
-                    .gap_6()
-                    .justify_center()
-                    .overflow_y_scroll()
-                    .child(
-                        h_flex()
-                            .w_full()
-                            .justify_center()
-                            .mb_4()
-                            .gap_4()
-                            .child(Vector::square(VectorName::ZedLogo, rems_from_px(45_f32)))
-                            .child(
-                                v_flex().child(Headline::new(welcome_label)).child(
-                                    Label::new("The editor for what's next")
-                                        .size(LabelSize::Small)
-                                        .color(Color::Muted)
-                                        .italic(),
+            // Which sections render depends on whether there are recent projects, so the
+            // content is withheld until they've loaded to avoid painting a layout that
+            // immediately changes.
+            .when(!loading_recent_projects, |this| {
+                this.child(
+                    v_flex()
+                        .id("welcome-content")
+                        .p_8()
+                        .max_w_128()
+                        .size_full()
+                        .gap_6()
+                        .justify_center()
+                        .overflow_y_scroll()
+                        .child(
+                            h_flex()
+                                .w_full()
+                                .justify_center()
+                                .mb_4()
+                                .gap_4()
+                                .child(Vector::square(VectorName::ZedLogo, rems_from_px(45_f32)))
+                                .child(
+                                    v_flex().child(Headline::new(welcome_label)).child(
+                                        Label::new("The editor for what's next")
+                                            .size(LabelSize::Small)
+                                            .color(Color::Muted)
+                                            .italic(),
+                                    ),
                                 ),
-                            ),
-                    )
-                    .child(first_section.render(Default::default(), &self.focus_handle))
-                    .child(second_section)
-                    .when(ai_enabled && !showing_recent_projects, |this| {
-                        let agent_tab_index = next_tab_index;
-                        next_tab_index += 1;
-                        this.child(self.render_agent_card(agent_tab_index, cx))
-                    })
-                    .when(!self.fallback_to_recent_projects, |this| {
-                        this.child(
-                            v_flex().gap_4().child(Divider::horizontal()).child(
-                                Button::new("welcome-exit", "Return to Onboarding")
-                                    .tab_index(next_tab_index as isize)
-                                    .full_width()
-                                    .label_size(LabelSize::XSmall)
-                                    .on_click(|_, window, cx| {
-                                        window.dispatch_action(OpenOnboarding.boxed_clone(), cx);
-                                    }),
-                            ),
                         )
-                    }),
-            )
+                        .child(first_section.render(Default::default(), &self.focus_handle))
+                        .child(second_section)
+                        .when(ai_enabled && !showing_recent_projects, |this| {
+                            let agent_tab_index = next_tab_index;
+                            next_tab_index += 1;
+                            this.child(self.render_agent_card(agent_tab_index, cx))
+                        })
+                        .when(!self.fallback_to_recent_projects, |this| {
+                            this.child(
+                                v_flex().gap_4().child(Divider::horizontal()).child(
+                                    Button::new("welcome-exit", "Return to Onboarding")
+                                        .tab_index(next_tab_index as isize)
+                                        .full_width()
+                                        .label_size(LabelSize::XSmall)
+                                        .on_click(|_, window, cx| {
+                                            window
+                                                .dispatch_action(OpenOnboarding.boxed_clone(), cx);
+                                        }),
+                                ),
+                            )
+                        }),
+                )
+            })
     }
 }
 
