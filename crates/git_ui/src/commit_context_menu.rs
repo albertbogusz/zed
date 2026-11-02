@@ -90,17 +90,12 @@ pub(crate) fn commit_context_menu(
                     cx.write_to_clipboard(ClipboardItem::new_string(ref_name.to_string()));
                 })
             })
-            .when(ref_name.is_none(), |menu| {
+            .when(ref_name.is_none() && !commit.tag_names.is_empty(), |menu| {
                 menu.map(|menu| {
                     let tag_names = commit.tag_names.clone();
                     let copy_tag_label = "Copy Tag";
 
                     match tag_names.as_slice() {
-                        [] => menu.item(
-                            ContextMenuEntry::new(copy_tag_label)
-                                .action(CopyCommitTag.boxed_clone())
-                                .disabled(true),
-                        ),
                         [tag_name] => {
                             let tag_name = tag_name.clone();
                             let label = format!("{copy_tag_label}: {tag_name}");
